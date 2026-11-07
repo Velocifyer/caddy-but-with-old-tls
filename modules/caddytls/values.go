@@ -41,9 +41,17 @@ func CipherSuiteID(name string) uint16 {
 }
 
 // SupportedCipherSuites returns a list of all the cipher suites
-// Caddy supports. The list is NOT ordered by security preference.
+// implemented by Go's crypto/tls, including insecure suites that must
+// be explicitly selected in a connection policy. The list is NOT ordered
+// by security preference.
 func SupportedCipherSuites() []*tls.CipherSuite {
-	return tls.CipherSuites()
+	// Since Go 1.14, crypto/tls separates cipher suites into secure defaults
+	// and suites considered insecure. Legacy browsers need some of the latter
+	// (such as RSA key exchange with AES-CBC or 3DES), but Go still supports
+	// them when explicitly configured in tls.Config.CipherSuites. Keep these
+	// suites discoverable by Caddy's name-to-ID validation without enabling
+	// them in any default policy.
+	return append(tls.CipherSuites(), tls.InsecureCipherSuites()...)
 }
 
 // defaultCipherSuites is the ordered list of all the cipher
@@ -117,7 +125,10 @@ var defaultCurves = []tls.CurveID{
 }
 
 // SupportedProtocols is a map of supported protocols.
+// TLS 1.0 and 1.1 are opt-in only; defaults remain TLS 1.2 and 1.3.
 var SupportedProtocols = map[string]uint16{
+	"tls1.0": tls.VersionTLS10,
+	"tls1.1": tls.VersionTLS11,
 	"tls1.2": tls.VersionTLS12,
 	"tls1.3": tls.VersionTLS13,
 }
@@ -127,8 +138,6 @@ var SupportedProtocols = map[string]uint16{
 var unsupportedProtocols = map[string]uint16{
 	//nolint:staticcheck
 	"ssl3.0": tls.VersionSSL30,
-	"tls1.0": tls.VersionTLS10,
-	"tls1.1": tls.VersionTLS11,
 }
 
 // publicKeyAlgorithms is the map of supported public key algorithms.
